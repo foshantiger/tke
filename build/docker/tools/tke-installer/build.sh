@@ -20,8 +20,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-REGISTRY_PREFIX=tkestack
-VERSION=$(git describe --dirty --always --tags | sed 's/-/./g')
+REGISTRY_PREFIX=${REGISTRY_PREFIX:-tkestack}
+VERSION=${VERSION:-$(git describe --dirty --always --tags | sed 's/-/./g')}
 PROVIDER_RES_VERSION=v1.14.6-1
 K8S_VERION=${PROVIDER_RES_VERSION%-*}
 OUTPUT_DIR=_output/

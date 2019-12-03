@@ -128,7 +128,7 @@ type CreateClusterPara struct {
 
 // Config is the installer config
 type Config struct {
-	Basic    Basic     `json:"basic"`
+	Basic    *Basic    `json:"basic"`
 	Auth     Auth      `json:"auth"`
 	Registry Registry  `json:"registry"`
 	Business *Business `json:"business,omitempty"`
@@ -249,7 +249,7 @@ type ThirdPartyHA struct {
 
 type Gateway struct {
 	Domain string `json:"domain"`
-	Cert   Cert   `json:"cert"`
+	Cert   *Cert  `json:"cert"`
 }
 
 type Cert struct {
@@ -291,10 +291,10 @@ type handler struct {
 type ClusterProgressStatus string
 
 const (
-	statusUnknown = "Unknown"
-	statusDoing   = "Doing"
-	statusSuccess = "Success"
-	statusFailed  = "Failed"
+	StatusUnknown = "Unknown"
+	StatusDoing   = "Doing"
+	StatusSuccess = "Success"
+	StatusFailed  = "Failed"
 )
 
 const (
@@ -330,7 +330,7 @@ func NewTKE(config *config.Config) *TKE {
 
 	c.clusterProviders = new(sync.Map)
 	c.process = new(ClusterProgress)
-	c.process.Status = statusUnknown
+	c.process.Status = StatusUnknown
 
 	return c
 }
@@ -689,6 +689,13 @@ func (t *TKE) prepare() errors.APIStatus {
 }
 
 func (t *TKE) SetConfigDefault(config *Config) {
+	if config.Basic == nil {
+		config.Basic = &Basic{
+			Username: "admin",
+			Password: []byte("admin"),
+		}
+	}
+
 	if config.Registry.TKERegistry != nil {
 		config.Registry.TKERegistry.Namespace = "library"
 		config.Registry.TKERegistry.Username = config.Basic.Username
@@ -700,16 +707,41 @@ func (t *TKE) SetConfigDefault(config *Config) {
 		config.Auth.TKEAuth.Password = config.Basic.Password
 	}
 
+	if config.Gateway != nil {
+		if config.Gateway.Domain == "" {
+			config.Gateway.Domain = "console.tke.com"
+		}
+		if config.Gateway.Cert == nil {
+			config.Gateway.Cert = &Cert{
+				SelfSignedCert: &SelfSignedCert{},
+			}
+		}
+	}
+
 }
 func (t *TKE) SetClusterDefault(cluster *platformv1.Cluster, config *Config) {
+	if cluster.APIVersion == "" {
+		cluster.APIVersion = platformv1.SchemeGroupVersion.String()
+	}
+	if cluster.Kind == "" {
+		cluster.Kind = "Cluster"
+	}
 	cluster.Name = "global"
 	cluster.Spec.DisplayName = "TKE"
-
 	cluster.Spec.TenantID = defaultTeantID
 	if t.Para.Config.Auth.TKEAuth != nil {
 		cluster.Spec.TenantID = t.Para.Config.Auth.TKEAuth.TenantID
 	}
 	cluster.Spec.Version = k8sVersion
+	if cluster.Spec.ClusterCIDR == "" {
+		cluster.Spec.ClusterCIDR = "10.244.0.0/16"
+	}
+	if cluster.Spec.Type == "" {
+		cluster.Spec.Type = platformv1.ClusterBaremetal
+	}
+	if cluster.Spec.NetworkDevice == "" {
+		cluster.Spec.NetworkDevice = "eth0"
+	}
 
 	if config.HA != nil && config.HA.ThirdPartyHA != nil {
 		cluster.Status.Addresses = append(cluster.Status.Addresses, platformv1.ClusterAddress{
@@ -840,7 +872,7 @@ func (t *TKE) createCluster(req *restful.Request, rsp *restful.Response) {
 	if apiStatus != nil {
 		_ = rsp.WriteHeaderAndJson(int(apiStatus.Status().Code), apiStatus.Status(), restful.MIME_JSON)
 	} else {
-		_ = rsp.WriteEntity(t.Para)
+		_ = rsp.WriteHeaderAndEntity(http.StatusCreated, t.Para)
 	}
 }
 
@@ -895,7 +927,7 @@ func (t *TKE) findClusterProgress(request *restful.Request, response *restful.Re
 	if apiStatus != nil {
 		response.WriteHeaderAndJson(int(apiStatus.Status().Code), apiStatus.Status(), restful.MIME_JSON)
 	} else {
-		if t.process.Status == statusSuccess {
+		if t.process.Status == StatusSuccess {
 			if t.Para.Config.Gateway != nil {
 				var host string
 				if t.Para.Config.Gateway.Domain != "" {
@@ -943,7 +975,7 @@ func (t *TKE) do() {
 
 	if t.Step == 0 {
 		t.log.Print("===>starting install task")
-		t.process.Status = statusDoing
+		t.process.Status = StatusDoing
 	}
 
 	if t.runAfterClusterReady() {
@@ -955,7 +987,7 @@ func (t *TKE) do() {
 		start := time.Now()
 		err := t.steps[t.Step].Func()
 		if err != nil {
-			t.process.Status = statusFailed
+			t.process.Status = StatusFailed
 			t.log.Printf("%d.%s [Failed] [%fs] error %s", t.Step, t.steps[t.Step].Name, time.Since(start).Seconds(), err)
 			return
 		}
@@ -965,7 +997,7 @@ func (t *TKE) do() {
 		t.backup()
 	}
 
-	t.process.Status = statusSuccess
+	t.process.Status = StatusSuccess
 	t.log.Printf("===>install task [Sucesss] [%fs]", time.Since(start).Seconds())
 }
 

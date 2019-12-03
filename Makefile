@@ -118,6 +118,11 @@ quick-release:
 release:
 	build/docker/tools/tke-installer/build.sh
 
+## release-test: test release
+.PHONY: release
+release-test:
+	go test tkestack.io/tke/test/e2e_installer
+
 ## help: Show this help info.
 .PHONY: help
 help: Makefile
