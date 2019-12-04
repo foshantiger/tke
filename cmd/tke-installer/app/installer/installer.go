@@ -1946,6 +1946,7 @@ func (t *TKE) pushImages() error {
 	cmd := exec.Command("sh", "-c",
 		fmt.Sprintf("docker images --format='{{.Repository}}:{{.Tag}}' --filter='reference=%s'", imagesFilter),
 	)
+	t.log.Print(cmd)
 	out, err := cmd.Output()
 	if err != nil {
 		return pkgerrors.Wrap(err, "docker images error")
@@ -1953,6 +1954,9 @@ func (t *TKE) pushImages() error {
 	tkeImages := strings.Split(strings.TrimSpace(string(out)), "\n")
 	for i, image := range tkeImages {
 		nameAndTag := strings.Split(image, ":")
+		if len(nameAndTag) != 2 {
+			continue
+		}
 		if nameAndTag[0] == "tke-installer" { // no need to push installer image for speed up
 			continue
 		}
