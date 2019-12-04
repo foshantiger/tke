@@ -21,7 +21,6 @@ package e2e_installer_test
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -69,7 +68,7 @@ var _ = Describe("bootstrap", func() {
 		var instanceIDs []*string
 		for i, one := range nodes {
 			fmt.Printf("delete instance %d %s\n", i, one.InternalIP)
-			instanceIDs = append(instanceIDs, &one.InstanceID)
+			instanceIDs = append(instanceIDs, &nodes[i].InstanceID)
 		}
 		err := provider.DeleteInstances(instanceIDs)
 		Expect(err).To(BeNil())
@@ -128,7 +127,7 @@ var _ = Describe("bootstrap", func() {
 			case installer.StatusUnknown, installer.StatusDoing:
 				return false, nil
 			case installer.StatusFailed:
-				return false, errors.New("install failed")
+				return false, fmt.Errorf("install failed:\n%s", progress.Data)
 			case installer.StatusSuccess:
 				return true, nil
 			default:

@@ -1183,6 +1183,12 @@ func (t *TKE) setupLocalRegistry() error {
 		return err
 	}
 
+	data, err := ioutil.ReadFile("hosts")
+	if err != nil {
+		return err
+	}
+	t.log.Print(string(data))
+
 	// for pull image from local registry on node
 	ip, err := util.GetExternalIP()
 	if err != nil {
@@ -1947,6 +1953,9 @@ func (t *TKE) pushImages() error {
 	tkeImages := strings.Split(strings.TrimSpace(string(out)), "\n")
 	for i, image := range tkeImages {
 		nameAndTag := strings.Split(image, ":")
+		if nameAndTag[0] == "tke-installer" { // no need to push installer image for speed up
+			continue
+		}
 		if nameAndTag[1] == "<none>" {
 			t.log.Printf("skip invalid tag:name=%s", image)
 			continue
